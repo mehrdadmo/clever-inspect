@@ -3,9 +3,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import DocumentUpload from '@/components/DocumentUpload';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import InspectionTemplate from '@/components/InspectionTemplate';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   FileText, 
   Bot, 
@@ -81,6 +84,10 @@ const Index = () => {
   const [processingStep, setProcessingStep] = useState(1);
   const [overallProgress, setOverallProgress] = useState(45);
   const [isEditing, setIsEditing] = useState(true);
+  const [steps, setSteps] = useState<any[]>([...mockProcessingSteps]);
+  const [pasteText, setPasteText] = useState('');
+  const [extractedData, setExtractedData] = useState<any | null>(null);
+  const { toast } = useToast();
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
     setUploadedFiles(files);
@@ -88,6 +95,40 @@ const Index = () => {
     setTimeout(() => {
       setActiveTab('processing');
     }, 2000);
+  };
+
+  const runAnalysis = async () => {
+  try {
+      // Mark AI analysis as processing
+      setSteps(prev => prev.map(s => s.id === 'ai-analysis' ? { ...s, status: 'processing', duration: undefined as undefined } : s));
+      setProcessingStep(1);
+      setOverallProgress(55);
+
+      const { data, error } = await supabase.functions.invoke('analyze-docs', {
+        body: { content: pasteText }
+      });
+
+      if (error) throw error;
+
+      const extracted = data?.extracted || {};
+      setExtractedData(extracted);
+
+      // Mark steps as completed and move forward
+      setSteps(prev => prev.map(s =>
+        s.id === 'ai-analysis' ? { ...s, status: 'completed', duration: s.duration ?? '2.1s' } :
+        s.id === 'data-extraction' ? { ...s, status: 'completed', duration: '1.2s' } :
+        s
+      ));
+      setProcessingStep(2);
+      setOverallProgress(90);
+
+      toast({ title: 'AI analysis complete', description: 'Data extracted successfully.' });
+      setActiveTab('template');
+    } catch (e: any) {
+      console.error('Analysis failed', e);
+      setSteps(prev => prev.map(s => s.id === 'ai-analysis' ? { ...s, status: 'error' } : s));
+      toast({ title: 'AI analysis failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+    }
   };
 
   const handleSaveTemplate = (data: any) => {
@@ -206,26 +247,32 @@ const Index = () => {
 
             <TabsContent value="processing" className="p-6">
               <ProcessingStatus 
-                steps={mockProcessingSteps}
+                steps={steps}
                 currentStep={processingStep}
                 overallProgress={overallProgress}
               />
-              
-              <div className="mt-6 flex justify-center">
-                <Button 
-                  variant="gradient" 
-                  size="lg"
-                  onClick={() => setActiveTab('template')}
-                >
-                  View Generated Template
-                  <BarChart3 className="w-4 h-4" />
-                </Button>
-              </div>
+
+              <Card className="mt-6 p-4">
+                <h4 className="font-medium mb-2">Paste document text for PoV</h4>
+                <p className="text-sm text-muted-foreground mb-3">Paste the contents of your Invoice / Bill of Lading / Certificate. OCR for PDFs/images can be added next.</p>
+                <Textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder="Paste document text here..."
+                  rows={6}
+                />
+                <div className="mt-4 flex justify-end">
+                  <Button variant="gradient" size="lg" onClick={runAnalysis}>
+                    Run AI Analysis
+                    <Bot className="w-4 h-4" />
+                  </Button>
+                </div>
+              </Card>
             </TabsContent>
 
             <TabsContent value="template" className="p-6">
               <InspectionTemplate
-                extractedData={mockExtractedData}
+                extractedData={extractedData ?? mockExtractedData}
                 isEditing={isEditing}
                 onSave={handleSaveTemplate}
                 onApprove={handleApproveTemplate}
