@@ -308,7 +308,7 @@ const Index = () => {
 
               {validation && (
                 <Card className="mt-4 p-4">
-                  <h4 className="font-medium mb-2">Validation Results</h4>
+                  <h4 className="font-medium mb-2">Enhanced Validation Results</h4>
                   <div className="space-y-2">
                     <div className={`flex items-center space-x-2 ${validation.passed ? 'text-success' : 'text-warning'}`}>
                       <CheckCircle className="w-4 h-4" />
@@ -316,12 +316,12 @@ const Index = () => {
                     </div>
                     {validation.errors?.length > 0 && (
                       <div className="text-sm text-destructive">
-                        <strong>Errors:</strong> {validation.errors.join(', ')}
+                        <strong>Errors ({validation.errors.length}):</strong> {validation.errors.join(', ')}
                       </div>
                     )}
                     {validation.warnings?.length > 0 && (
                       <div className="text-sm text-warning">
-                        <strong>Warnings:</strong> {validation.warnings.join(', ')}
+                        <strong>Warnings ({validation.warnings.length}):</strong> {validation.warnings.join(', ')}
                       </div>
                     )}
                   </div>
@@ -330,11 +330,12 @@ const Index = () => {
 
               {embeddings.length > 0 && (
                 <Card className="mt-4 p-4">
-                  <h4 className="font-medium mb-2">Vector Embeddings (Qdrant)</h4>
-                  <p className="text-sm text-muted-foreground mb-2">First 10 dimensions stored in vector database:</p>
+                  <h4 className="font-medium mb-2">Vector Database (Qdrant)</h4>
+                  <p className="text-sm text-muted-foreground mb-2">Text chunked and stored with embeddings (first 10 dimensions shown):</p>
                   <div className="text-xs font-mono bg-muted p-2 rounded">
                     [{embeddings.map(v => v.toFixed(4)).join(', ')}...]
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">Collection: documents @ {process.env.NODE_ENV === 'development' ? 'localhost:6333' : 'your-qdrant-url'}</p>
                 </Card>
               )}
             </TabsContent>
