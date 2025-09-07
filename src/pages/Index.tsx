@@ -29,28 +29,33 @@ interface UploadedFile {
 const mockProcessingSteps = [
   {
     id: 'ocr',
-    name: 'Document OCR & Text Extraction',
-    status: 'completed' as const,
-    duration: '2.3s',
-    description: 'Converting documents to machine-readable text'
-  },
-  {
-    id: 'ai-analysis',
-    name: 'AI Content Analysis',
-    status: 'processing' as const,
-    description: 'ChatGPT-5 Nano analyzing document content and structure'
-  },
-  {
-    id: 'data-extraction',
-    name: 'Structured Data Extraction',
+    name: 'OCR → DocTR',
     status: 'pending' as const,
-    description: 'Extracting key information from bills of lading, invoices, certificates'
+    description: 'Document text extraction using DocTR'
   },
   {
-    id: 'template-generation',
-    name: 'Template Generation',
+    id: 'layout',
+    name: 'Layout Parsing → LayoutParser + pdfplumber',
     status: 'pending' as const,
-    description: 'Generating inspection certificate from extracted data'
+    description: 'Document structure analysis'
+  },
+  {
+    id: 'ai',
+    name: 'LLM → GPT-5 Nano',
+    status: 'pending' as const,
+    description: 'AI content analysis and extraction'
+  },
+  {
+    id: 'vector',
+    name: 'Vector DB → Qdrant',
+    status: 'pending' as const,
+    description: 'Embedding storage for similarity search'
+  },
+  {
+    id: 'validation',
+    name: 'Validation → Regex + rules',
+    status: 'pending' as const,
+    description: 'Data validation and quality checks'
   }
 ];
 
@@ -87,6 +92,8 @@ const Index = () => {
   const [steps, setSteps] = useState<any[]>([...mockProcessingSteps]);
   const [pasteText, setPasteText] = useState('');
   const [extractedData, setExtractedData] = useState<any | null>(null);
+  const [validation, setValidation] = useState<any | null>(null);
+  const [embeddings, setEmbeddings] = useState<number[]>([]);
   const { toast } = useToast();
 
   const handleFilesUploaded = (files: UploadedFile[]) => {
@@ -98,36 +105,64 @@ const Index = () => {
   };
 
   const runAnalysis = async () => {
-  try {
-      // Mark AI analysis as processing
-      setSteps(prev => prev.map(s => s.id === 'ai-analysis' ? { ...s, status: 'processing', duration: undefined as undefined } : s));
-      setProcessingStep(1);
-      setOverallProgress(55);
+    try {
+      // Reset states
+      setSteps([...mockProcessingSteps]);
+      setProcessingStep(0);
+      setOverallProgress(0);
+      setExtractedData(null);
+      setValidation(null);
+      setEmbeddings([]);
 
-      const { data, error } = await supabase.functions.invoke('analyze-docs', {
+      toast({ title: 'Enhanced processing started', description: 'Running full document processing pipeline...' });
+
+      const { data, error } = await supabase.functions.invoke('enhanced-doc-processing', {
         body: { content: pasteText }
       });
 
       if (error) throw error;
 
-      const extracted = data?.extracted || {};
-      setExtractedData(extracted);
+      // Update steps from response
+      if (data?.steps) {
+        setSteps(data.steps);
+      }
 
-      // Mark steps as completed and move forward
-      setSteps(prev => prev.map(s =>
-        s.id === 'ai-analysis' ? { ...s, status: 'completed', duration: s.duration ?? '2.1s' } :
-        s.id === 'data-extraction' ? { ...s, status: 'completed', duration: '1.2s' } :
-        s
-      ));
-      setProcessingStep(2);
-      setOverallProgress(90);
+      // Set extracted data
+      if (data?.extracted) {
+        setExtractedData(data.extracted);
+      }
 
-      toast({ title: 'AI analysis complete', description: 'Data extracted successfully.' });
+      // Set validation results
+      if (data?.validation) {
+        setValidation(data.validation);
+      }
+
+      // Set embeddings
+      if (data?.embeddings) {
+        setEmbeddings(data.embeddings);
+      }
+
+      setProcessingStep(5);
+      setOverallProgress(100);
+
+      const validationMsg = data?.validation?.passed 
+        ? 'All validations passed'
+        : `${data?.validation?.errors?.length || 0} errors, ${data?.validation?.warnings?.length || 0} warnings`;
+
+      toast({ 
+        title: 'Enhanced processing complete', 
+        description: `Data extracted and validated. ${validationMsg}` 
+      });
+      
       setActiveTab('template');
     } catch (e: any) {
-      console.error('Analysis failed', e);
-      setSteps(prev => prev.map(s => s.id === 'ai-analysis' ? { ...s, status: 'error' } : s));
-      toast({ title: 'AI analysis failed', description: e?.message || 'Please try again.', variant: 'destructive' });
+      console.error('Enhanced analysis failed', e);
+      setSteps(prev => prev.map(s => ({ ...s, status: 'error' as const })));
+      toast({ 
+        title: 'Enhanced processing failed', 
+        description: e?.message || 'Please try again.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -253,21 +288,55 @@ const Index = () => {
               />
 
               <Card className="mt-6 p-4">
-                <h4 className="font-medium mb-2">Paste document text for PoV</h4>
-                <p className="text-sm text-muted-foreground mb-3">Paste the contents of your Invoice / Bill of Lading / Certificate. OCR for PDFs/images can be added next.</p>
+                <h4 className="font-medium mb-2">Enhanced Document Processing Pipeline</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Full AI pipeline: OCR → Layout Parsing → GPT-5 Nano Analysis → Vector DB → Validation
+                </p>
                 <Textarea
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
-                  placeholder="Paste document text here..."
+                  placeholder="Paste document text here (Invoice, Bill of Lading, Certificate)..."
                   rows={6}
                 />
                 <div className="mt-4 flex justify-end">
-                  <Button variant="gradient" size="lg" onClick={runAnalysis}>
-                    Run AI Analysis
+                  <Button variant="gradient" size="lg" onClick={runAnalysis} disabled={!pasteText.trim()}>
+                    Run Enhanced Processing
                     <Bot className="w-4 h-4" />
                   </Button>
                 </div>
               </Card>
+
+              {validation && (
+                <Card className="mt-4 p-4">
+                  <h4 className="font-medium mb-2">Validation Results</h4>
+                  <div className="space-y-2">
+                    <div className={`flex items-center space-x-2 ${validation.passed ? 'text-success' : 'text-warning'}`}>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{validation.passed ? 'All validations passed' : 'Validation issues found'}</span>
+                    </div>
+                    {validation.errors?.length > 0 && (
+                      <div className="text-sm text-destructive">
+                        <strong>Errors:</strong> {validation.errors.join(', ')}
+                      </div>
+                    )}
+                    {validation.warnings?.length > 0 && (
+                      <div className="text-sm text-warning">
+                        <strong>Warnings:</strong> {validation.warnings.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {embeddings.length > 0 && (
+                <Card className="mt-4 p-4">
+                  <h4 className="font-medium mb-2">Vector Embeddings (Qdrant)</h4>
+                  <p className="text-sm text-muted-foreground mb-2">First 10 dimensions stored in vector database:</p>
+                  <div className="text-xs font-mono bg-muted p-2 rounded">
+                    [{embeddings.map(v => v.toFixed(4)).join(', ')}...]
+                  </div>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="template" className="p-6">
