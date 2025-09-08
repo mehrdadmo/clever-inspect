@@ -116,11 +116,18 @@ const Index = () => {
 
       toast({ title: 'Enhanced processing started', description: 'Running full document processing pipeline...' });
 
+      console.log('Invoking enhanced-doc-processing with content:', pasteText.substring(0, 100) + '...');
+
       const { data, error } = await supabase.functions.invoke('enhanced-doc-processing', {
         body: { content: pasteText }
       });
 
-      if (error) throw error;
+      console.log('Enhanced processing response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
 
       // Update steps from response
       if (data?.steps) {

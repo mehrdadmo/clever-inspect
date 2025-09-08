@@ -306,6 +306,8 @@ function validateDocument(extracted: Record<string, unknown>): { passed: boolean
 
 // Enhanced AI analysis with GPT-5 Nano for extraction + summary
 async function performAIAnalysis(layoutResult: LayoutResult): Promise<{ extracted: Record<string, unknown>; summary: string }> {
+  console.log("AI Analysis: Starting GPT-5 Nano processing");
+  
   const content = layoutResult.text;
   const structure = layoutResult.structure;
   
@@ -360,6 +362,8 @@ Your response must be a JSON object with TWO main parts:
 
 Focus on accuracy and completeness. Use confidence score based on clarity of extracted information.`;
 
+  console.log("AI Analysis: Sending request to OpenAI GPT-5 Nano");
+  
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -377,8 +381,12 @@ Focus on accuracy and completeness. Use confidence score based on clarity of ext
       }),
   });
 
+  console.log("AI Analysis: Response status:", response.status);
+
   if (!response.ok) {
-    throw new Error(`AI Analysis failed: ${response.statusText}`);
+    const errorText = await response.text();
+    console.error("AI Analysis error response:", errorText);
+    throw new Error(`AI Analysis failed: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -414,12 +422,28 @@ serve(async (req: Request) => {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    console.log("Enhanced Doc Processing: Starting request processing");
+    
+    const body = await req.json().catch((e) => {
+      console.error("JSON parsing error:", e);
+      return {};
+    });
+    
     const content: string = body?.content || "";
+    console.log("Content length:", content.length, "characters");
     
     if (!content) {
+      console.error("No content provided in request body");
       return new Response(JSON.stringify({ error: "No content provided" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -481,10 +505,13 @@ serve(async (req: Request) => {
 
   } catch (error) {
     console.error("Enhanced processing error:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+    
     return new Response(JSON.stringify({ 
-      error: String(error),
+      error: error instanceof Error ? error.message : String(error),
+      details: error instanceof Error ? error.stack : undefined,
       steps: [
-        { id: 'error', name: 'Processing Error', status: 'error', description: String(error) }
+        { id: 'error', name: 'Processing Error', status: 'error', description: error instanceof Error ? error.message : String(error) }
       ]
     }), {
       status: 500,
