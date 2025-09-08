@@ -116,6 +116,29 @@ const Index = () => {
 
       toast({ title: 'Enhanced processing started', description: 'Running full document processing pipeline...' });
 
+      // Simulate step-by-step progress
+      const updateProgress = (stepIndex: number, stepStatus: 'processing' | 'completed', progress: number) => {
+        setSteps(prev => prev.map((step, index) => ({
+          ...step,
+          status: index < stepIndex ? 'completed' : index === stepIndex ? stepStatus : 'pending'
+        })));
+        setProcessingStep(stepIndex);
+        setOverallProgress(progress);
+      };
+
+      // Step 1: OCR
+      updateProgress(0, 'processing', 10);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      updateProgress(0, 'completed', 20);
+
+      // Step 2: Layout Parsing
+      updateProgress(1, 'processing', 30);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      updateProgress(1, 'completed', 40);
+
+      // Step 3: AI Analysis
+      updateProgress(2, 'processing', 50);
+      
       console.log('Invoking enhanced-doc-processing with content:', pasteText.substring(0, 100) + '...');
 
       const { data, error } = await supabase.functions.invoke('enhanced-doc-processing', {
@@ -128,6 +151,18 @@ const Index = () => {
         console.error('Supabase function error:', error);
         throw error;
       }
+
+      updateProgress(2, 'completed', 70);
+
+      // Step 4: Vector DB
+      updateProgress(3, 'processing', 80);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      updateProgress(3, 'completed', 90);
+
+      // Step 5: Validation
+      updateProgress(4, 'processing', 95);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      updateProgress(4, 'completed', 100);
 
       // Update steps from response
       if (data?.steps) {
@@ -149,9 +184,6 @@ const Index = () => {
         setEmbeddings(data.embeddings);
       }
 
-      setProcessingStep(5);
-      setOverallProgress(100);
-
       const validationMsg = data?.validation?.passed 
         ? 'All validations passed'
         : `${data?.validation?.errors?.length || 0} errors, ${data?.validation?.warnings?.length || 0} warnings`;
@@ -165,6 +197,7 @@ const Index = () => {
     } catch (e: any) {
       console.error('Enhanced analysis failed', e);
       setSteps(prev => prev.map(s => ({ ...s, status: 'error' as const })));
+      setOverallProgress(0);
       toast({ 
         title: 'Enhanced processing failed', 
         description: e?.message || 'Please try again.', 
