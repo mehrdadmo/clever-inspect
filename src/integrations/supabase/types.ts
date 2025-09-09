@@ -14,7 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_size: number | null
+          filename: string
+          id: string
+          mime_type: string | null
+          status: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_size?: number | null
+          filename: string
+          id?: string
+          mime_type?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_size?: number | null
+          filename?: string
+          id?: string
+          mime_type?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      extracted_entities: {
+        Row: {
+          bounding_box: Json | null
+          confidence: number | null
+          created_at: string
+          document_id: string
+          entity_type: string
+          entity_value: string
+          id: string
+          page_number: number | null
+        }
+        Insert: {
+          bounding_box?: Json | null
+          confidence?: number | null
+          created_at?: string
+          document_id: string
+          entity_type: string
+          entity_value: string
+          id?: string
+          page_number?: number | null
+        }
+        Update: {
+          bounding_box?: Json | null
+          confidence?: number | null
+          created_at?: string
+          document_id?: string
+          entity_type?: string
+          entity_value?: string
+          id?: string
+          page_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_entities_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      processing_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          document_id: string
+          error_message: string | null
+          id: string
+          job_type: string
+          processing_time_ms: number | null
+          progress: number | null
+          result: Json | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          document_id: string
+          error_message?: string | null
+          id?: string
+          job_type?: string
+          processing_time_ms?: number | null
+          progress?: number | null
+          result?: Json | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          document_id?: string
+          error_message?: string | null
+          id?: string
+          job_type?: string
+          processing_time_ms?: number | null
+          progress?: number | null
+          result?: Json | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processing_jobs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
