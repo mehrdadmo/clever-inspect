@@ -139,18 +139,18 @@ const Index = () => {
       // Step 3: AI Analysis
       updateProgress(2, 'processing', 50);
       
-      console.log('Invoking enhanced-doc-processing with content:', pasteText.substring(0, 100) + '...');
+      console.log('Processing document with new backend...');
 
-      const { data, error } = await supabase.functions.invoke('enhanced-doc-processing', {
-        body: { content: pasteText }
+      // Import the API service
+      const { DocumentProcessingAPI } = await import('@/services/api');
+
+      // Process the document using the new backend
+      const response = await DocumentProcessingAPI.processDocument({
+        document_content: pasteText
       });
 
-      console.log('Enhanced processing response:', { data, error });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
+      console.log('Document processing response:', response);
+      const data = response;
 
       updateProgress(2, 'completed', 70);
 
@@ -164,29 +164,25 @@ const Index = () => {
       await new Promise(resolve => setTimeout(resolve, 300));
       updateProgress(4, 'completed', 100);
 
-      // Update steps from response
-      if (data?.steps) {
-        setSteps(data.steps);
+      // Set extracted data from new API response
+      if (data?.extracted_data) {
+        setExtractedData(data.extracted_data);
       }
 
-      // Set extracted data
-      if (data?.extracted) {
-        setExtractedData(data.extracted);
-      }
+      // Create validation result from the response
+      const validation = {
+        passed: data.success,
+        errors: data.success ? [] : ['Processing failed'],
+        warnings: []
+      };
+      setValidation(validation);
 
-      // Set validation results
-      if (data?.validation) {
-        setValidation(data.validation);
-      }
+      // Set embeddings info - just use empty array for now since we're not displaying embeddings directly
+      setEmbeddings([]);
 
-      // Set embeddings
-      if (data?.embeddings) {
-        setEmbeddings(data.embeddings);
-      }
-
-      const validationMsg = data?.validation?.passed 
-        ? 'All validations passed'
-        : `${data?.validation?.errors?.length || 0} errors, ${data?.validation?.warnings?.length || 0} warnings`;
+      const validationMsg = validation.passed 
+        ? `All validations passed. Processed ${data.ocr_result?.text_length || 0} characters, stored ${data.vector_storage?.chunks_stored || 0} chunks`
+        : `Processing failed`;
 
       toast({ 
         title: 'Enhanced processing complete', 
